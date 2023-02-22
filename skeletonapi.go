@@ -109,8 +109,7 @@ func New(sqlConn *sqlx.DB, dbSchema string) (SkeletonAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	authManager := NewAuthManager(&config,
-		NewRestyClient(context.Background(), &config, true))
+	authManager := NewAuthManager(config.OIDCBaseURL, config.ClientID, config.ClientSecret)
 	internalApiRestyClient := NewRestyClientWithAuthManager(context.Background(), &config, authManager)
 	cerberusClient, err := NewCerberusClient(config.CerberusURL, internalApiRestyClient)
 	if err != nil {
