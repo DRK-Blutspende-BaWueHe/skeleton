@@ -101,7 +101,7 @@ func (s *skeleton) SaveAnalysisRequestsInstrumentTransmissions(ctx context.Conte
 }
 
 func (s *skeleton) GetRequestMappingsByInstrumentID(instrumentID uuid.UUID) ([]RequestMapping, error) {
-	return []RequestMapping{}, nil
+	return s.analysisRepository.GetRequestMappingsByInstrumentID(context.TODO(), instrumentID)
 }
 
 func (s *skeleton) SubmitAnalysisResult(ctx context.Context, resultData AnalysisResult, submitTypes ...SubmitType) error {

@@ -200,6 +200,8 @@ type AnalysisRepository interface {
 	GetAnalysisRequestsInfo(ctx context.Context, instrumentID uuid.UUID, filter Filter) ([]AnalysisRequestInfo, int, error)
 	GetAnalysisResultsInfo(ctx context.Context, instrumentID uuid.UUID, filter Filter) ([]AnalysisResultInfo, int, error)
 	GetAnalysisBatches(ctx context.Context, instrumentID uuid.UUID, filter Filter) ([]AnalysisBatch, int, error)
+	GetRequestMappingsByInstrumentID(ctx context.Context, instrumentID uuid.UUID) ([]RequestMapping, error)
+	GetAnalyteIDsToRequestMapID(ctx context.Context, requestMapID uuid.UUID) ([]uuid.UUID, error)
 	//GetAnalysisRequestsForVisualization(ctx context.Context) (map[string][]AnalysisRequest, error)
 	CreateSubjectsBatch(ctx context.Context, subjectInfosByAnalysisRequestID map[uuid.UUID]SubjectInfo) (map[uuid.UUID]uuid.UUID, error)
 	GetSubjectsByAnalysisRequestIDs(ctx context.Context, analysisRequestIDs []uuid.UUID) (map[uuid.UUID]SubjectInfo, error)
@@ -361,6 +363,63 @@ func (r *analysisRepository) GetAnalysisRequestsBySampleCodeAndAnalyteID(ctx con
 	}
 
 	return analysisRequests, err
+}
+
+func (r *analysisRepository) GetRequestMappingsByInstrumentID(ctx context.Context, instrumentID uuid.UUID) ([]RequestMapping, error) {
+	requestMappings := make([]RequestMapping, 0)
+
+	query := fmt.Sprintf(`SELECT * FROM %s.sk_request_mappings WHERE instrument_id = :instrument_id;`, r.dbSchema)
+
+	rows, err := r.db.NamedQueryContext(ctx, query, map[string]interface{}{"instrument_id": instrumentID})
+	if err != nil {
+		log.Error().Err(err).Msg("Can not get analysis request list")
+		return requestMappings, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		mapping := requestMappingDAO{}
+		err := rows.StructScan(&mapping)
+		if err != nil {
+			log.Error().Err(err).Msg("Can not scan RequestMapping data")
+			return requestMappings, err
+		}
+
+		requestMapping := convertRequestMappingDaoToRequestMapping(mapping)
+		if requestMapping.AnalyteIDs, err = r.GetAnalyteIDsToRequestMapID(ctx, requestMapping.ID); err != nil {
+			return requestMappings, err
+		}
+
+		requestMappings = append(requestMappings, requestMapping)
+	}
+
+	return requestMappings, err
+}
+
+func (r *analysisRepository) GetAnalyteIDsToRequestMapID(ctx context.Context, requestMapID uuid.UUID) ([]uuid.UUID, error) {
+	analyteIDs := make([]uuid.UUID, 0)
+
+	query := fmt.Sprintf(`SELECT analyte_id FROM %s.sk_request_mapping_analytes WHERE request_mapping_id = :request_mapping_id;`, r.dbSchema)
+
+	rows, err := r.db.NamedQueryContext(ctx, query, map[string]interface{}{"request_mapping_id": requestMapID})
+	if err != nil {
+		log.Error().Err(err).Msg("Can not get analysis request list")
+		return analyteIDs, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var analyteID uuid.UUID
+		err := rows.Scan(&analyteID)
+		if err != nil {
+			log.Error().Err(err).Msg("Can not scan RequestMapping data")
+			return analyteIDs, err
+		}
+
+		analyteIDs = append(analyteIDs, analyteID)
+	}
+
+	return analyteIDs, err
 }
 
 func (r *analysisRepository) GetAnalysisRequestsBySampleCodes(ctx context.Context, sampleCodes []string) (map[string][]AnalysisRequest, error) {
@@ -2149,6 +2208,16 @@ func convertRequestInfoDAOToRequestInfo(analysisRequestInfoDAO analysisRequestIn
 	}
 
 	return analysisRequestInfo
+}
+
+func convertRequestMappingDaoToRequestMapping(requestMappingDao requestMappingDAO) RequestMapping {
+	requestMapping := RequestMapping{
+		ID:        requestMappingDao.ID,
+		Code:      requestMappingDao.Code,
+		IsDefault: requestMappingDao.IsDefault,
+	}
+
+	return requestMapping
 }
 
 func convertResultInfoDAOToResultInfo(analysisResultInfoDAO analysisResultInfoDAO) AnalysisResultInfo {
