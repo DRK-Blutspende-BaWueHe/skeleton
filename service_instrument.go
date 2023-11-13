@@ -2,12 +2,13 @@ package skeleton
 
 import (
 	"context"
+	"time"
+
 	"github.com/DRK-Blutspende-BaWueHe/logcom-api/logcom"
 	"github.com/DRK-Blutspende-BaWueHe/skeleton/config"
 	"github.com/DRK-Blutspende-BaWueHe/skeleton/db"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-	"time"
 )
 
 type InstrumentService interface {
@@ -253,12 +254,24 @@ func (s *instrumentService) GetInstrumentByID(ctx context.Context, tx db.DbConne
 		requestMappingsByIDs[requestMappingID].AnalyteIDs = analyteIDs
 	}
 
-	settingsMap, err := s.instrumentRepository.GetInstrumentsSettings(ctx, instrumentIDs)
+	settingsMap, err := s.instrumentRepository.WithTransaction(tx).GetInstrumentsSettings(ctx, instrumentIDs)
 	if err != nil {
 		return instrument, err
 	}
 	if _, ok := settingsMap[id]; ok {
 		instrument.Settings = settingsMap[id]
+		//set the value of password settings to an empty string
+		protocolSettings, err := s.instrumentRepository.WithTransaction(tx).GetProtocolSettings(ctx, instrument.ProtocolID)
+		if err != nil {
+			return instrument, err
+		}
+		for _, instrumentSetting := range instrument.Settings {
+			for _, protocolSetting := range protocolSettings {
+				if instrumentSetting.ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password {
+					instrumentSetting.Value = ""
+				}
+			}
+		}
 	}
 
 	return instrument, nil
