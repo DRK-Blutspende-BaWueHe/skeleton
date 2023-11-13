@@ -6,7 +6,7 @@ CREATE TABLE <SCHEMA_PLACEHOLDER>.sk_protocol_settings_types(
     constraint sk_pk_protocol_settings_types primary key("type")
 );
 
-INSERT INTO <SCHEMA_PLACEHOLDER>.sk_protocol_settings_types("type") VALUES('string'),('int'),('bool');
+INSERT INTO <SCHEMA_PLACEHOLDER>.sk_protocol_settings_types("type") VALUES('string'),('int'),('bool'),('password');
 
 CREATE TABLE <SCHEMA_PLACEHOLDER>.sk_protocol_settings(
     id uuid not null default(uuid_generate_v4()),
