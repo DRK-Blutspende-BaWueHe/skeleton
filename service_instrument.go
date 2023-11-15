@@ -265,10 +265,10 @@ func (s *instrumentService) GetInstrumentByID(ctx context.Context, tx db.DbConne
 		if err != nil {
 			return instrument, err
 		}
-		for _, instrumentSetting := range instrument.Settings {
+		for i, instrumentSetting := range instrument.Settings {
 			for _, protocolSetting := range protocolSettings {
 				if instrumentSetting.ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password {
-					instrumentSetting.Value = ""
+					instrument.Settings[i].Value = ""
 				}
 			}
 		}
