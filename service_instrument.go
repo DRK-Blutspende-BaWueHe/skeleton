@@ -831,8 +831,8 @@ func (s *instrumentService) hideInstrumentPasswordSettings(ctx context.Context, 
 		return settings, err
 	}
 	for i, instrumentSetting := range instrument.Settings {
+		settings = append(settings, instrument.Settings[i])
 		for _, protocolSetting := range protocolSettings {
-			settings = append(settings, instrument.Settings[i])
 			if instrumentSetting.ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password {
 				settings[i].Value = ""
 			}
