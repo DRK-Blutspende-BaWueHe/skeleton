@@ -303,6 +303,7 @@ func (s *instrumentService) GetInstrumentByID(ctx context.Context, tx db.DbConne
 	if err != nil {
 		return instrument, err
 	}
+
 	if instrumentSettings, ok := settingsMap[id]; ok {
 		instrument.Settings = instrumentSettings
 
