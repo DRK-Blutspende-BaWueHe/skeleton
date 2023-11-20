@@ -64,7 +64,7 @@ func (s *instrumentService) CreateInstrument(ctx context.Context, instrument Ins
 	}
 	for i, instrumentSetting := range instrument.Settings {
 		for _, protocolSetting := range protocolSettings {
-			if instrumentSetting.ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password && instrument.Settings[i].Value != "" && utils.IsBase64Encoded(instrument.Settings[i].Value) {
+			if instrumentSetting.ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password && instrument.Settings[i].Value != "" && !utils.IsBase64Encoded(instrument.Settings[i].Value) {
 				instrument.Settings[i].Value = utils.Base64Encode(instrument.Settings[i].Value)
 			}
 		}
@@ -115,7 +115,21 @@ func (s *instrumentService) CreateInstrument(ctx context.Context, instrument Ins
 }
 
 func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword bool) ([]Instrument, error) {
+	var err error
 	if instruments := s.instrumentCache.GetAll(); len(instruments) > 0 {
+		for _, instrument := range instruments {
+			if hidePassword {
+				instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, false)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, true)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
 		return instruments, nil
 	}
 
@@ -211,14 +225,14 @@ func (s *instrumentService) GetInstrumentByID(ctx context.Context, tx db.DbConne
 	if !bypassCache {
 		if instrument, ok := s.instrumentCache.GetByID(id); ok {
 			if hidePassword {
-				instrument.Settings, err = s.getSecureInstrumentSettings(ctx, instrument)
+				instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, false)
 				if err != nil {
-					return instrument, err
+					return Instrument{}, err
 				}
 			} else {
-				instrument.Settings, err = s.getSettingsWithDecryptedPassword(ctx, instrument)
+				instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, true)
 				if err != nil {
-					return instrument, err
+					return Instrument{}, err
 				}
 			}
 			return instrument, nil
@@ -294,14 +308,14 @@ func (s *instrumentService) GetInstrumentByID(ctx context.Context, tx db.DbConne
 		instrument.Settings = instrumentSettings
 
 		if hidePassword {
-			instrument.Settings, err = s.getSecureInstrumentSettings(ctx, instrument)
+			instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, false)
 			if err != nil {
-				return instrument, err
+				return Instrument{}, err
 			}
 		} else {
-			instrument.Settings, err = s.getSettingsWithDecryptedPassword(ctx, instrument)
+			instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, true)
 			if err != nil {
-				return instrument, err
+				return Instrument{}, err
 			}
 		}
 	}
@@ -310,7 +324,19 @@ func (s *instrumentService) GetInstrumentByID(ctx context.Context, tx db.DbConne
 }
 
 func (s *instrumentService) GetInstrumentByIP(ctx context.Context, ip string, hidePassword bool) (Instrument, error) {
+	var err error
 	if instrument, ok := s.instrumentCache.GetByIP(ip); ok {
+		if hidePassword {
+			instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, false)
+			if err != nil {
+				return Instrument{}, err
+			}
+		} else {
+			instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, true)
+			if err != nil {
+				return Instrument{}, err
+			}
+		}
 		return instrument, nil
 	}
 
@@ -389,14 +415,14 @@ func (s *instrumentService) GetInstrumentByIP(ctx context.Context, ip string, hi
 		instrument.Settings = instrumentSettings
 
 		if hidePassword {
-			instrument.Settings, err = s.getSecureInstrumentSettings(ctx, instrument)
+			instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, false)
 			if err != nil {
-				return instrument, err
+				return Instrument{}, err
 			}
 		} else {
-			instrument.Settings, err = s.getSettingsWithDecryptedPassword(ctx, instrument)
+			instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, true)
 			if err != nil {
-				return instrument, err
+				return Instrument{}, err
 			}
 		}
 	}
@@ -610,7 +636,17 @@ func (s *instrumentService) UpdateInstrument(ctx context.Context, instrument Ins
 		return err
 	}
 
+	//encode the password settings if exist and not encoded
+	protocolSettings, err := s.instrumentRepository.GetProtocolSettings(ctx, instrument.ProtocolID)
+	if err != nil {
+		return err
+	}
 	for i := range instrument.Settings {
+		for _, protocolSetting := range protocolSettings {
+			if instrument.Settings[i].ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password && instrument.Settings[i].Value != "" && !utils.IsBase64Encoded(instrument.Settings[i].Value) {
+				instrument.Settings[i].Value = utils.Base64Encode(instrument.Settings[i].Value)
+			}
+		}
 		err = s.instrumentRepository.WithTransaction(tx).UpsertInstrumentSetting(ctx, instrument.ID, instrument.Settings[i])
 		if err != nil {
 			_ = tx.Rollback()
@@ -854,7 +890,7 @@ func (s *instrumentService) retryInstrumentRegistration(ctx context.Context, id 
 	}()
 }
 
-func (s *instrumentService) getSecureInstrumentSettings(ctx context.Context, instrument Instrument) ([]InstrumentSetting, error) {
+func (s *instrumentService) getDecodedPasswordSettings(ctx context.Context, instrument Instrument, enablePasswordDecoding bool) ([]InstrumentSetting, error) {
 	settings := make([]InstrumentSetting, 0)
 	protocolSettings, err := s.instrumentRepository.GetProtocolSettings(ctx, instrument.ProtocolID)
 	if err != nil {
@@ -864,28 +900,15 @@ func (s *instrumentService) getSecureInstrumentSettings(ctx context.Context, ins
 		settings = append(settings, instrument.Settings[i])
 		for _, protocolSetting := range protocolSettings {
 			if instrumentSetting.ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password {
-				settings[i].Value = ""
-			}
-		}
-	}
-	return settings, nil
-}
-
-func (s *instrumentService) getSettingsWithDecryptedPassword(ctx context.Context, instrument Instrument) ([]InstrumentSetting, error) {
-	settings := make([]InstrumentSetting, 0)
-	protocolSettings, err := s.instrumentRepository.GetProtocolSettings(ctx, instrument.ProtocolID)
-	if err != nil {
-		return settings, err
-	}
-	for i, instrumentSetting := range instrument.Settings {
-		settings = append(settings, instrument.Settings[i])
-		for _, protocolSetting := range protocolSettings {
-			if instrumentSetting.ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password {
-				decodedPassword, err := utils.Base64Decode(settings[i].Value)
-				if err != nil {
-					return settings, err
+				if enablePasswordDecoding {
+					decodedPassword, err := utils.Base64Decode(settings[i].Value)
+					if err != nil {
+						return settings, err
+					}
+					settings[i].Value = decodedPassword
+				} else {
+					settings[i].Value = ""
 				}
-				settings[i].Value = decodedPassword
 			}
 		}
 	}

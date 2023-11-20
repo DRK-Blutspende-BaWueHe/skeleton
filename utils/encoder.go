@@ -9,8 +9,7 @@ func IsBase64Encoded(originalString string) bool {
 }
 
 func Base64Encode(originalString string) string {
-	originalBytes := []byte(originalString)
-	return base64.URLEncoding.EncodeToString(originalBytes)
+	return base64.StdEncoding.EncodeToString([]byte(originalString))
 }
 
 func Base64Decode(encodedString string) (string, error) {
@@ -19,7 +18,5 @@ func Base64Decode(encodedString string) (string, error) {
 		return "", err
 	}
 
-	decodedString := string(decodedBytes)
-
-	return decodedString, nil
+	return string(decodedBytes), nil
 }
