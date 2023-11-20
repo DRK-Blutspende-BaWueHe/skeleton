@@ -914,3 +914,24 @@ func (s *instrumentService) getDecodedPasswordSettings(ctx context.Context, inst
 	}
 	return settings, nil
 }
+
+func (s *instrumentService) getSettingsWithDecryptedPassword(ctx context.Context, instrument Instrument) ([]InstrumentSetting, error) {
+	settings := make([]InstrumentSetting, 0)
+	protocolSettings, err := s.instrumentRepository.GetProtocolSettings(ctx, instrument.ProtocolID)
+	if err != nil {
+		return settings, err
+	}
+	for i, instrumentSetting := range instrument.Settings {
+		settings = append(settings, instrument.Settings[i])
+		for _, protocolSetting := range protocolSettings {
+			if instrumentSetting.ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password {
+				decodedPassword, err := utils.Base64Decode(settings[i].Value)
+				if err != nil {
+					return settings, err
+				}
+				settings[i].Value = decodedPassword
+			}
+		}
+	}
+	return settings, nil
+}
