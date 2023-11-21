@@ -884,15 +884,13 @@ func (s *instrumentService) retryInstrumentRegistration(ctx context.Context, id 
 
 func (s *instrumentService) getDecodedPasswordSettings(ctx context.Context, instrument Instrument, hidePassword bool, protocolSettings []ProtocolSetting) ([]InstrumentSetting, error) {
 	settings := make([]InstrumentSetting, 0)
-	var passwordProtocolMap map[uuid.UUID]bool
+	passwordProtocolMap := map[uuid.UUID]bool{}
 	for _, protocolSetting := range protocolSettings {
-		if protocolSetting.Type == Password {
-			passwordProtocolMap[protocolSetting.ID] = true
-		}
+		passwordProtocolMap[protocolSetting.ID] = protocolSetting.Type == Password
 	}
 	for i, instrumentSetting := range instrument.Settings {
 		settings = append(settings, instrument.Settings[i])
-		if _, exists := passwordProtocolMap[instrumentSetting.ProtocolSettingID]; exists {
+		if exists, ok := passwordProtocolMap[instrumentSetting.ProtocolSettingID]; ok && exists {
 			if !hidePassword {
 				decodedPassword, err := utils.Base64Decode(settings[i].Value)
 				if err != nil {
