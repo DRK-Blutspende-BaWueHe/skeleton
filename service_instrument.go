@@ -217,8 +217,7 @@ func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword boo
 		if _, ok := instrumentsByIDs[instrumentID]; !ok {
 			continue
 		}
-		instrument := instrumentsByIDs[instrumentID]
-		instrument.Settings = settings
+		instrumentsByIDs[instrumentID].Settings = settings
 	}
 
 	s.instrumentCache.Set(instruments)
