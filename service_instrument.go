@@ -116,12 +116,20 @@ func (s *instrumentService) CreateInstrument(ctx context.Context, instrument Ins
 
 func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword bool) ([]Instrument, error) {
 	var err error
+	protocolsMap := map[uuid.UUID][]ProtocolSetting{}
 	if instruments := s.instrumentCache.GetAll(); len(instruments) > 0 {
 		for _, instrument := range instruments {
-			protocolSettings, err := s.instrumentRepository.GetProtocolSettings(ctx, instrument.ProtocolID)
-			if err != nil {
-				return nil, err
+			var protocolSettings []ProtocolSetting
+			if value, exists := protocolsMap[instrument.ProtocolID]; exists {
+				protocolSettings = value
+			} else {
+				protocolSettings, err = s.instrumentRepository.GetProtocolSettings(ctx, instrument.ProtocolID)
+				if err != nil {
+					return nil, err
+				}
+				protocolsMap[instrument.ProtocolID] = protocolSettings
 			}
+
 			instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
 			if err != nil {
 				return nil, err
@@ -210,18 +218,27 @@ func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword boo
 			continue
 		}
 		instrument := instrumentsByIDs[instrumentID]
-		protocolSettings, err := s.instrumentRepository.GetProtocolSettings(ctx, instrument.ProtocolID)
-		if err != nil {
-			return nil, err
-		}
 		instrument.Settings = settings
-		instrument.Settings, err = s.getDecodedPasswordSettings(ctx, *instrument, hidePassword, protocolSettings)
+	}
+
+	s.instrumentCache.Set(instruments)
+
+	for _, instrument := range instruments {
+		var protocolSettings []ProtocolSetting
+		if value, exists := protocolsMap[instrument.ProtocolID]; exists {
+			protocolSettings = value
+		} else {
+			protocolSettings, err = s.instrumentRepository.GetProtocolSettings(ctx, instrument.ProtocolID)
+			if err != nil {
+				return nil, err
+			}
+			protocolsMap[instrument.ProtocolID] = protocolSettings
+		}
+		instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
 		if err != nil {
 			return nil, err
 		}
 	}
-
-	s.instrumentCache.Set(instruments)
 
 	return instruments, nil
 }
