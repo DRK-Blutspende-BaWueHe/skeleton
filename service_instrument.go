@@ -62,11 +62,19 @@ func (s *instrumentService) CreateInstrument(ctx context.Context, instrument Ins
 	if err != nil {
 		return uuid.Nil, err
 	}
-	for i, instrumentSetting := range instrument.Settings {
+	for i, _ := range instrument.Settings {
 		for _, protocolSetting := range protocolSettings {
-			if instrumentSetting.ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password && instrument.Settings[i].Value != "" && !utils.IsBase64Encoded(instrument.Settings[i].Value) {
+			if instrument.Settings[i].ProtocolSettingID != protocolSetting.ID {
+				continue
+			}
+			if protocolSetting.Type != Password {
+				break
+			}
+
+			if instrument.Settings[i].Value != "" && !utils.IsBase64Encoded(instrument.Settings[i].Value) {
 				instrument.Settings[i].Value = utils.Base64Encode(instrument.Settings[i].Value)
 			}
+			break
 		}
 	}
 
@@ -652,11 +660,11 @@ func (s *instrumentService) UpdateInstrument(ctx context.Context, instrument Ins
 	for i := range instrument.Settings {
 		isSettingUpdateExcluded := false
 		for _, protocolSetting := range protocolSettings {
-			if protocolSetting.Type != Password {
-				break
-			}
 			if instrument.Settings[i].ProtocolSettingID != protocolSetting.ID {
 				continue
+			}
+			if protocolSetting.Type != Password {
+				break
 			}
 
 			if instrument.Settings[i].Value == "" {
