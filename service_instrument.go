@@ -652,23 +652,27 @@ func (s *instrumentService) UpdateInstrument(ctx context.Context, instrument Ins
 	for i := range instrument.Settings {
 		isSettingUpdateExcluded := false
 		for _, protocolSetting := range protocolSettings {
-			if protocolSetting.Type != Password || instrument.Settings[i].ProtocolSettingID != protocolSetting.ID {
+			if protocolSetting.Type != Password {
+				break
+			}
+			if instrument.Settings[i].ProtocolSettingID != protocolSetting.ID {
 				continue
 			}
-			if instrument.Settings[i].Value != "" && !utils.IsBase64Encoded(instrument.Settings[i].Value) {
-				instrument.Settings[i].Value = utils.Base64Encode(instrument.Settings[i].Value)
-			} else if instrument.Settings[i].ProtocolSettingID == protocolSetting.ID && protocolSetting.Type == Password && instrument.Settings[i].Value == "" {
-				// execlude unchanged password setting from being updated
+
+			if instrument.Settings[i].Value == "" {
 				isSettingUpdateExcluded = true
+			} else if !utils.IsBase64Encoded(instrument.Settings[i].Value) {
+				instrument.Settings[i].Value = utils.Base64Encode(instrument.Settings[i].Value)
 			}
 			break
 		}
-		if !isSettingUpdateExcluded {
-			err = s.instrumentRepository.WithTransaction(tx).UpsertInstrumentSetting(ctx, instrument.ID, instrument.Settings[i])
-			if err != nil {
-				_ = tx.Rollback()
-				return err
-			}
+		if isSettingUpdateExcluded {
+			continue
+		}
+		err = s.instrumentRepository.WithTransaction(tx).UpsertInstrumentSetting(ctx, instrument.ID, instrument.Settings[i])
+		if err != nil {
+			_ = tx.Rollback()
+			return err
 		}
 	}
 
