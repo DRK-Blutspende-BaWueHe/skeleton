@@ -126,7 +126,7 @@ func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword boo
 	var err error
 	protocolsMap := map[uuid.UUID][]ProtocolSetting{}
 	if instruments := s.instrumentCache.GetAll(); len(instruments) > 0 {
-		for _, instrument := range instruments {
+		for i, instrument := range instruments {
 			var protocolSettings []ProtocolSetting
 			if value, exists := protocolsMap[instrument.ProtocolID]; exists {
 				protocolSettings = value
@@ -138,7 +138,7 @@ func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword boo
 				protocolsMap[instrument.ProtocolID] = protocolSettings
 			}
 
-			instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
+			instruments[i].Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
 			if err != nil {
 				return nil, err
 			}
@@ -230,7 +230,7 @@ func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword boo
 
 	s.instrumentCache.Set(instruments)
 
-	for _, instrument := range instruments {
+	for i, instrument := range instruments {
 		var protocolSettings []ProtocolSetting
 		if value, exists := protocolsMap[instrument.ProtocolID]; exists {
 			protocolSettings = value
@@ -241,7 +241,7 @@ func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword boo
 			}
 			protocolsMap[instrument.ProtocolID] = protocolSettings
 		}
-		instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
+		instruments[i].Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
 		if err != nil {
 			return nil, err
 		}
