@@ -7,7 +7,6 @@ import (
 	"github.com/DRK-Blutspende-BaWueHe/logcom-api/logcom"
 	"github.com/DRK-Blutspende-BaWueHe/skeleton/config"
 	"github.com/DRK-Blutspende-BaWueHe/skeleton/db"
-	"github.com/DRK-Blutspende-BaWueHe/skeleton/utils"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
@@ -55,22 +54,6 @@ func (s *instrumentService) CreateInstrument(ctx context.Context, instrument Ins
 	transaction, err := s.instrumentRepository.CreateTransaction()
 	if err != nil {
 		return uuid.Nil, err
-	}
-
-	// iterate custom settings and base64 all passwords
-	protocolSettings, err := s.instrumentRepository.WithTransaction(transaction).GetProtocolSettings(ctx, instrument.ProtocolID)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	for i := range instrument.Settings {
-		for _, protocolSetting := range protocolSettings {
-			if protocolSetting.Type != Password || instrument.Settings[i].ProtocolSettingID != protocolSetting.ID {
-				continue
-			}
-			if instrument.Settings[i].Value != "" && !utils.IsBase64Encoded(instrument.Settings[i].Value) {
-				instrument.Settings[i].Value = utils.Base64Encode(instrument.Settings[i].Value)
-			}
-		}
 	}
 
 	id, err := s.instrumentRepository.WithTransaction(transaction).CreateInstrument(ctx, instrument)
@@ -664,8 +647,6 @@ func (s *instrumentService) UpdateInstrument(ctx context.Context, instrument Ins
 
 			if instrument.Settings[i].Value == "" {
 				isSettingUpdateExcluded = true
-			} else if !utils.IsBase64Encoded(instrument.Settings[i].Value) {
-				instrument.Settings[i].Value = utils.Base64Encode(instrument.Settings[i].Value)
 			}
 			break
 		}
@@ -926,13 +907,7 @@ func (s *instrumentService) getDecodedPasswordSettings(ctx context.Context, inst
 	for i, instrumentSetting := range instrument.Settings {
 		settings = append(settings, instrument.Settings[i])
 		if _, ok := passwordProtocolSettingsMap[instrumentSetting.ProtocolSettingID]; ok {
-			if !hidePassword {
-				decodedPassword, err := utils.Base64Decode(settings[i].Value)
-				if err != nil {
-					return settings, err
-				}
-				settings[i].Value = decodedPassword
-			} else {
+			if hidePassword {
 				settings[i].Value = ""
 			}
 		}
