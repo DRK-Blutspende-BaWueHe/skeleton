@@ -116,7 +116,7 @@ func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword boo
 				protocolsMap[instrument.ProtocolID] = protocolSettings
 			}
 
-			instruments[i].Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
+			instruments[i].Settings = getSettings(ctx, instrument, hidePassword, protocolSettings)
 			if err != nil {
 				return nil, err
 			}
@@ -219,7 +219,7 @@ func (s *instrumentService) GetInstruments(ctx context.Context, hidePassword boo
 			}
 			protocolsMap[instrument.ProtocolID] = protocolSettings
 		}
-		instruments[i].Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
+		instruments[i].Settings = getSettings(ctx, instrument, hidePassword, protocolSettings)
 		if err != nil {
 			return nil, err
 		}
@@ -236,7 +236,7 @@ func (s *instrumentService) GetInstrumentByID(ctx context.Context, tx db.DbConne
 			if err != nil {
 				return Instrument{}, err
 			}
-			instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
+			instrument.Settings = getSettings(ctx, instrument, hidePassword, protocolSettings)
 			if err != nil {
 				return Instrument{}, err
 			}
@@ -315,7 +315,7 @@ func (s *instrumentService) GetInstrumentByID(ctx context.Context, tx db.DbConne
 		if err != nil {
 			return Instrument{}, err
 		}
-		instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
+		instrument.Settings = getSettings(ctx, instrument, hidePassword, protocolSettings)
 		if err != nil {
 			return Instrument{}, err
 		}
@@ -331,7 +331,7 @@ func (s *instrumentService) GetInstrumentByIP(ctx context.Context, ip string, hi
 		if err != nil {
 			return Instrument{}, err
 		}
-		instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
+		instrument.Settings = getSettings(ctx, instrument, hidePassword, protocolSettings)
 		if err != nil {
 			return Instrument{}, err
 		}
@@ -415,7 +415,7 @@ func (s *instrumentService) GetInstrumentByIP(ctx context.Context, ip string, hi
 			return Instrument{}, err
 		}
 		instrument.Settings = instrumentSettings
-		instrument.Settings, err = s.getDecodedPasswordSettings(ctx, instrument, hidePassword, protocolSettings)
+		instrument.Settings = getSettings(ctx, instrument, hidePassword, protocolSettings)
 		if err != nil {
 			return Instrument{}, err
 		}
@@ -896,7 +896,7 @@ func (s *instrumentService) retryInstrumentRegistration(ctx context.Context, id 
 	}()
 }
 
-func (s *instrumentService) getDecodedPasswordSettings(ctx context.Context, instrument Instrument, hidePassword bool, protocolSettings []ProtocolSetting) ([]InstrumentSetting, error) {
+func getSettings(ctx context.Context, instrument Instrument, hidePassword bool, protocolSettings []ProtocolSetting) []InstrumentSetting {
 	settings := make([]InstrumentSetting, 0)
 	passwordProtocolSettingsMap := map[uuid.UUID]bool{}
 	for _, protocolSetting := range protocolSettings {
@@ -912,5 +912,5 @@ func (s *instrumentService) getDecodedPasswordSettings(ctx context.Context, inst
 			}
 		}
 	}
-	return settings, nil
+	return settings
 }
